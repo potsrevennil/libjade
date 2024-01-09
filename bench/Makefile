@@ -16,7 +16,7 @@ EXCLUDE ?= crypto_xof/shake256/amd64/spec/
 # --------------------------------------------------------------------
 AS      ?= as
 CC      ?= clang
-CFLAGS  ?= -Wall -Wno-unused-function -march=native -O3 -fomit-frame-pointer -fwrapv -fPIC -fPIE
+CFLAGS  ?= -Wall -Wno-unused-function -march=native -O3 -fomit-frame-pointer -fwrapv -fPIC -fPIE -z noexecstack
 JASMIN  ?= jasminc
 
 # --------------------------------------------------------------------
@@ -82,7 +82,7 @@ MAIN        = $(COMMON)/crypto_$(OPERATION).c
 DEFINE     ?=
 DNAMESPACES = -DJADE_NAMESPACE=$(NAMESPACE1) -DJADE_NAMESPACE_LC=$(NAMESPACE)
 INCLUDES    = -I$(IDIR)/include/ -I$(COMMON)/ -I$(RANDINC)
-COMPILE     = $(CC) $(CFLAGS) -o $@ $(DEFINE) $(DNAMESPACES) $(INCLUDES) $(MAIN) $(ASM) $(RANDLIB) -lgsl $(CIL)
+COMPILE     = $(CC) $(CFLAGS) -o $@ $(DEFINE) $(DNAMESPACES) $(INCLUDES) $(MAIN) $(ASM) $(RANDLIB) -lgsl -lgslcblas $(CIL)
 
 # --------------------------------------------------------------------
 .PHONY: __phony benchs
