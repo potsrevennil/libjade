@@ -1,0 +1,358 @@
+from Jade require "crypto_kem/frodo/common/amd64/avx2/shake128.jinc"
+
+#[returnaddress="stack"]
+fn __AS_plus_E(reg ptr u16[NNBAR] B, reg ptr u8[BYTES_SEED_A]seedA, reg ptr u16[NNBAR] S E, reg u64 ms) -> stack u16[NNBAR], #msf reg u64 {
+    #mmx reg ptr u16[NNBAR] s_B;
+    stack u16[N] A_row;
+    stack ptr u8[BYTES_SEED_A] s_seedA;
+    #mmx reg ptr u16[NNBAR] s_S s_E;
+    stack u8[2 + BYTES_SEED_A] b;
+    reg bool bb bb1;
+
+    reg u64 i j; stack u64 s_j;
+    reg u16 tmp ac;
+
+    inline int k l;
+
+    s_B = B; s_S = S; s_E = E;
+
+    // copy seedA
+    for k = 0 to BYTES_SEED_A {
+        b[k + 2] = seedA[k];
+    }
+    s_seedA = seedA;
+
+    // calculate A and B += A * S
+    b[u16 0] = 0;
+    i = 0;
+
+    while {
+        bb = i < NNBAR;
+    }(bb) {
+        ms = #update_msf(bb, ms);
+
+        s_j = j; s_S = S; s_B = B; s_E = E; 
+        A_row, ms = __shake128_gen_A(A_row, b, ms);
+        j = s_j; S = s_S; B = s_B; E = s_E;
+
+        for k = 0 to NBAR {
+            ac = 0;
+            j = 0;
+
+            // A_row * S_T_row
+            while {
+                bb1 = j < N;
+            }(bb1) {
+                ms = #update_msf(bb1, ms);
+
+                for l = 0 to 4 {
+                    tmp = A_row[(int)j + l];
+                    tmp *= S[(int)j + k * N + l];
+                    ac += tmp;
+                }
+                j += 4;
+            }
+            ms = #update_msf(!bb1, ms);
+
+            B[(int)i + k] = E[(int)i + k];
+            B[(int)i + k] += ac;
+        }
+
+        b[u16 0] += 1;
+        i += NBAR;
+    }
+    ms = #update_msf(!bb, ms);
+    
+    return B, ms;
+}
+
+#[returnaddress="stack"]
+fn __SA_plus_E(reg ptr u16[NNBAR] B, reg ptr u8[BYTES_SEED_A]seedA, reg ptr u16[NNBAR] S E, reg u64 ms) -> stack u16[NNBAR], #msf reg u64 {
+    #mmx reg ptr u16[NNBAR] s_B;
+    stack u16[N] A_row;
+    stack ptr u8[BYTES_SEED_A] s_seedA;
+    #mmx reg ptr u16[NNBAR] s_S s_E;
+    stack u8[2 + BYTES_SEED_A] b;
+
+    reg u64 i j; stack u64 s_j;
+    inline int k l;
+    reg u16 tmp s;
+    reg bool bb bb1;
+
+    // copy seedA
+    for k = 0 to BYTES_SEED_A {
+        b[k + 2] = seedA[k];
+    }
+    s_seedA = seedA;
+
+    i = 0;
+    while {
+        bb = i < NNBAR;
+    } (bb) {
+       ms = #update_msf(bb, ms);
+
+       for k = 0 to 4 {
+        B[(int)i + k] = E[(int)i + k];
+       }
+       i += 4;
+    }
+    ms = #update_msf(!bb, ms);
+    s_B = B; s_S = S; s_E = E;
+
+    // calculate A and B += S * A
+    b[u16 0] = 0;
+    i = 0;
+
+    while { 
+        bb = i < N;
+    } (bb) {
+        ms = #update_msf(bb, ms);
+        A_row, ms = __shake128_gen_A(A_row, b, ms);
+
+        for k = 0 to NBAR {
+            S = s_S;
+
+            s = S[(int)i + k * N];
+
+            s_S = S;
+
+            j = s_j; B = s_B;
+            j = 0;
+            while {
+                bb1 = j < N;
+            } (bb1) {
+                ms = #update_msf(bb1, ms);
+
+                for l = 0 to 4 {
+                    tmp = A_row[(int)j + l];
+                    tmp *= s;
+                    B[(int)j + k * N + l] += tmp;
+                }
+
+                j += 4;
+            }
+            ms = #update_msf(!bb1, ms);
+            s_j = j; s_B = B;
+        }
+
+        i += 1;
+        b[u16 0] = (16u)i;
+    }
+    ms = #update_msf(!bb, ms);
+
+    return B, ms;
+}
+
+#[returnaddress="stack"]
+fn __SB_plus_E(reg ptr u16[NBAR * NBAR] V, reg ptr u16[NNBAR] S B, reg ptr u16[NBAR * NBAR] E, reg u64 ms) -> stack u16[NBAR * NBAR], #msf reg u64 {
+    reg u64 k tj;
+    inline int i j l;
+    reg u16 tmp ac;
+    reg bool b;
+
+    for i = 0 to NBAR {
+        for j = 0 to NBAR {
+            k = 0;
+            ac = 0;
+
+            while {
+                b = k < N;
+            } (b) {
+                ms = #update_msf(b, ms);
+
+                for l = 0 to 4 {
+                    tmp = S[(int)k + i * N + l];
+                    tj = k;
+                    tj *= NBAR;
+                    tj += l * NBAR + j;
+                    tmp *= B[(int)tj];
+
+                    ac += tmp;
+                }
+                k += 4;
+            }
+            ms = #update_msf(!b, ms);
+
+            V[i * NBAR + j] = E[i * NBAR + j];
+            V[i * NBAR + j] += ac;
+            V[i * NBAR + j] &= (1 << D) - 1;
+        }
+    }
+
+    return V, ms;
+}
+
+fn __matrix_add(reg ptr u16[NBAR * NBAR] a b, reg u64 ms) -> stack u16[NBAR * NBAR], #msf reg u64 {
+    reg u64 i;
+    inline int j;
+    reg u16 tmp;
+    reg bool bb;
+
+    i = 0;
+    while {
+        bb = i < NBAR * NBAR;
+    } (bb) {
+        ms = #update_msf(bb, ms);
+
+        for j = 0 to 4 {
+            tmp = a[(int)i + j];
+            tmp += b[(int)i + j];
+            tmp &= (1 << D) - 1;
+            a[(int)i + j] = tmp;
+        }
+        i += 4;
+    } 
+    ms = #update_msf(!bb, ms);
+
+    return a, ms;
+}
+
+#[returnaddress="stack"]
+// a = b - a
+fn __matrix_sub(reg ptr u16[NBAR * NBAR] a b, reg u64 ms) -> stack u16[NBAR * NBAR], #msf reg u64 {
+    reg u64 i;
+    inline int j;
+    reg u16 tmp;
+    reg bool bb;
+
+    i = 0;
+    while {
+        bb = i < NBAR * NBAR;
+    } (bb) {
+        ms = #update_msf(bb, ms);
+
+        for j = 0 to 4 {
+            tmp = b[(int)i + j];
+            tmp -= a[(int)i + j];
+            tmp &= (1 << D) - 1;
+            a[(int)i + j] = tmp;
+        }
+        i += 4;
+    }
+    ms = #update_msf(!bb, ms);
+
+    return a, ms;
+}
+
+#[returnaddress="stack"]
+fn __mul_BS(reg ptr u16[NBAR * NBAR] M, reg ptr u16[NNBAR]B S, reg u64 ms) -> stack u16[NBAR * NBAR], #msf reg u64 {
+    reg u64 k;
+    inline int i j l;
+    reg u16 tmp;
+    reg bool b;
+
+    for i = 0 to NBAR {
+        for j = 0 to NBAR {
+            M[i * NBAR + j] = 0;
+
+            k = 0;
+            while {
+                b = k < N;
+            } (b) {
+                ms = #update_msf(b, ms);
+
+                for l = 0 to 4 {
+                    tmp = B[(int)k + i * N + l];
+                    tmp *= S[(int)k + j * N + l];
+                    M[i * NBAR + j] += tmp;
+                }
+
+                k += 4;
+            }
+            ms = #update_msf(!b, ms);
+            M[i * NBAR + j] &= (1 << D) - 1;
+        }
+    }
+
+    return M, ms;
+}
+
+#[returnaddress="stack"]
+fn __ct_verify_NNBAR(reg ptr u16[NNBAR] a b, reg u64 ms) -> stack u8, #msf reg u64 {
+    reg u64 i;
+    inline int j;
+    reg u16 ac tmp;
+    reg u8 r;
+    reg bool bb;
+
+    i = 0;
+    ac = 0;
+    while {
+        bb = i < NNBAR;
+    } (bb) {
+        ms = #update_msf(bb, ms);
+
+        for j = 0 to 4 {
+            tmp = a[(int) i + j];
+            tmp ^= b[(int)i + j];
+            ac |= tmp;
+        }
+        i += 4;
+    }
+    ms = #update_msf(!bb, ms);
+
+    tmp = ac * -1;
+    ac |= tmp;
+    ac >>= 15;
+    ac *= (-1);
+
+    r = (8u)ac;
+
+    return r, ms;
+}
+
+#[returnaddress="stack"]
+fn __ct_verify_NBAR2(reg ptr u16[NBAR * NBAR] a b, reg u64 ms) -> stack u8, #msf reg u64 {
+    reg u64 i;
+    inline int j;
+    reg u16 ac tmp;
+    reg u8 r;
+    reg bool bb;
+
+    i = 0;
+    ac = 0;
+    while {
+        bb = i < NBAR * NBAR;
+    } (bb) {
+        ms = #update_msf(bb, ms);
+
+        for j = 0 to 4 {
+            tmp = a[(int) i + j];
+            tmp ^= b[(int)i + j];
+            ac |= tmp;
+        }
+        i += 4;
+    }
+    ms = #update_msf(!bb, ms);
+
+    tmp = ac * -1;
+    ac |= tmp;
+    ac >>= 15;
+    ac *= (-1);
+
+    r = (8u) ac;
+
+    return r, ms;
+}
+
+#[returnaddress="stack"]
+fn __ct_select(reg ptr u8[BYTES_SEC] out a b, reg u8 selector) -> stack u8[BYTES_SEC] {
+    inline int i;
+
+    reg u8 n_selector tmp;
+
+    n_selector = selector;
+    n_selector ^= 0xFF;
+
+    for i = 0 to BYTES_SEC {
+        tmp = a[i];
+        tmp &= n_selector;
+        out[i] = tmp;
+
+        tmp = b[i];
+        tmp &= selector;
+        out[i] |= tmp;
+    }
+
+    return out;
+}

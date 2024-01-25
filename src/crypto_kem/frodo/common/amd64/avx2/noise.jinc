@@ -1,0 +1,99 @@
+fn __sample_2NNBAR(reg ptr u16[2 * NNBAR] s, reg u64 ms) -> stack u16[2 * NNBAR], #msf reg u64 {
+    reg ptr u16[CDF_TABLE_LEN] cdftp;
+    cdftp = CDF_TABLE;
+
+    reg bool b;
+    reg u64 i;
+    reg u16 tmp_sample sample prnd sign;
+    inline int j k;
+
+    i = 0;
+    while {
+        b = i < 2 * NNBAR;
+    } (b) {
+        ms = #update_msf(b, ms);
+
+        for k = 0 to 4 {
+            sample = 0;
+
+            // prnd = s[i] >> 1
+            prnd = s[(int)i + k];
+            prnd >>= 1;
+
+            // sign = s[(int)i] & 0x1
+            sign = s[(int)i + k];
+            sign &= 0x1;
+
+            // no need to compare with the last value
+            for j = 0 to CDF_TABLE_LEN - 1 {
+                // sample += (CDF_TABLE[j] - prnd) >> 15
+
+                tmp_sample = cdftp[j];
+                tmp_sample -= prnd;
+                tmp_sample >>= 15;
+                sample += tmp_sample;
+            }
+
+            // s[i] = ((-sign) ^ sample) + sign
+            s[(int)i + k] = 0;
+            s[(int)i + k] -= sign;
+            s[(int)i + k] ^= sample;
+            s[(int)i + k] += sign;
+        }
+
+        i += 4;
+    }
+    ms = #update_msf(!b, ms);
+
+    return s, ms;
+}
+
+fn __sample_NBAR2(reg ptr u16[NBAR * NBAR] s, reg u64 ms) -> stack u16[NBAR * NBAR], #msf reg u64 {
+    reg ptr u16[CDF_TABLE_LEN] cdftp;
+    cdftp = CDF_TABLE;
+
+    reg u64 i;
+    reg bool b;
+    reg u16 tmp_sample sample prnd sign;
+    inline int j k;
+
+    i = 0;
+    while {
+        b = i < NBAR * NBAR;
+    } (b) {
+        ms = #update_msf(b, ms);
+
+        for k = 0 to 4 {
+            sample = 0;
+
+            // prnd = s[i] >> 1
+            prnd = s[(int)i + k];
+            prnd >>= 1;
+
+            // sign = s[(int)i] & 0x1
+            sign = s[(int)i + k];
+            sign &= 0x1;
+
+            // no need to compare with the last value
+            for j = 0 to CDF_TABLE_LEN - 1 {
+                // sample += (CDF_TABLE[j] - prnd) >> 15
+
+                tmp_sample = cdftp[j];
+                tmp_sample -= prnd;
+                tmp_sample >>= 15;
+                sample += tmp_sample;
+            }
+
+            // s[i] = ((-sign) ^ sample) + sign
+            s[(int)i + k] = 0;
+            s[(int)i + k] -= sign;
+            s[(int)i + k] ^= sample;
+            s[(int)i + k] += sign;
+        }
+
+        i += 4;
+    }
+    ms = #update_msf(!b, ms);
+
+    return s, ms;
+}

@@ -1,0 +1,47 @@
+from Jade require "crypto_kem/frodo/common/frodo976_params.jinc"
+from Jade require "crypto_kem/frodo/frodo976shake/amd64/avx2/kem.jinc"
+
+export fn jade_kem_frodo_frodo976shake_amd64_avx2_keypair_derand(#transient reg u64 pkp skp coinsp) -> #public reg u64 {
+    reg u64 r ms;
+    ms = #init_msf();
+
+    ms = _frodo_amd64_avx2_keypair_derand(pkp, skp, coinsp, ms);
+    ?{}, r = #set0();
+    return r;
+}
+
+export fn jade_kem_frodo_frodo976shake_amd64_avx2_keypair(#transient reg u64 pkp skp) -> #public reg u64 {
+    reg u64 r ms;
+    ms = #init_msf();
+
+    ms = _frodo_amd64_avx2_keypair(pkp, skp, ms);
+    ?{}, r = #set0();
+    return r;
+}
+
+export fn jade_kem_frodo_frodo976shake_amd64_avx2_enc_derand(#transient reg u64 ctp ssp pkp coinsp) -> #public reg u64 {
+    reg u64 r ms;
+    ms = #init_msf();
+
+    ms = _frodo_amd64_avx2_enc_derand(ctp, ssp, pkp, coinsp, ms);
+    ?{}, r = #set0();
+    return r;
+}
+
+export fn jade_kem_frodo_frodo976shake_amd64_avx2_enc(#transient reg u64 ctp ssp pkp) -> #public reg u64 {
+    reg u64 r ms;
+    ms = #init_msf();
+
+    ms = _frodo_amd64_avx2_enc(ctp, ssp, pkp, ms);
+    ?{}, r = #set0();
+    return r;
+}
+
+export fn jade_kem_frodo_frodo976shake_amd64_avx2_dec(#transient reg u64 ssp ctp skp) -> #public reg u64 {
+    reg u64 r ms;
+    ms = #init_msf();
+
+    ms = _frodo_amd64_avx2_dec(ssp, ctp, skp, ms);
+    ?{}, r = #set0();
+    return r;
+}
