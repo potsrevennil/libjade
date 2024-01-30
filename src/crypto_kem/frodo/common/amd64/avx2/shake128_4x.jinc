@@ -1,0 +1,143 @@
+from Jade require "common/keccak/keccak1600/amd64/avx2/keccak1600.jinc"
+from Jade require "common/keccak/keccak1600/amd64/avx2/keccakf1600.jinc"
+from Jade require "common/keccak/keccak1600/amd64/avx2/keccakf1600_4x.jinc"
+
+param int SHAKE128_RATE = 168;
+u256 SHAKE_SEP = (4u64)[0x8000000000000000, 0x8000000000000000, 0x8000000000000000, 0x8000000000000000];
+
+fn __shake128_gen_A_4x(
+  reg ptr u8[2 * N] out0 out1 out2 out3,
+  reg const ptr u8[2 + BYTES_SEED_A] in0 in1 in2 in3)
+  ->
+  reg ptr u8[2 * N],
+  reg ptr u8[2 * N],
+  reg ptr u8[2 * N],
+  reg ptr u8[2 * N]
+  {
+    stack u256[25] state;
+    reg ptr u64[25] a_jagged_p;
+    reg u256 t256 tmp;
+    reg u128 t128;
+    reg u64 t64 i;
+    reg u16 t16;
+    reg u8 t8;
+    reg bool b;
+
+    inline int INLEN OUTLEN OUTRND k;
+
+    INLEN = 2 + BYTES_SEED_A;
+    OUTLEN = 2 * N;
+    OUTRND = OUTLEN / SHAKE128_RATE;
+
+    a_jagged_p = KECCAK_A_JAGGED;
+
+    // init state
+    for k = 0 to 25
+    {
+        t256 = #set0_256();
+        state[k] = t256;
+    }
+
+    // absorb final block
+    for k = 0 to INLEN >> 3 {
+        t64 = in0[u64 k];
+        state[u64 4 * k] ^= t64;
+        t64 = in1[u64 k];
+        state[u64 4 * k + 1] ^= t64;
+        t64 = in2[u64 k];
+        state[u64 4 * k + 2] ^= t64;
+        t64 = in3[u64 k];
+        state[u64 4 * k + 3] ^= t64;
+    }
+
+    for k = 0 to INLEN % 8 >> 1 {
+        t16 = in0[u16 k + (INLEN - INLEN % 8)/2];
+        state[u16 2 * (INLEN - INLEN % 8) + k] ^= t16;
+
+        t16 = in1[u16 k + (INLEN - INLEN % 8)/2];
+        state[u16 2 * (INLEN - INLEN % 8) + 4 + k] ^= t16;
+
+        t16 = in2[u16 k + (INLEN - INLEN % 8)/2];
+        state[u16 2 * (INLEN - INLEN % 8) + 8 + k] ^= t16;
+
+        t16 = in3[u16 k + (INLEN - INLEN % 8)/2];
+        state[u16 2 * (INLEN - INLEN % 8) + 12 + k] ^= t16;
+    }
+
+    state[u8 4 * (INLEN - INLEN % 8) + INLEN % 8] ^= 0x1F;
+    state[u8 4 * (INLEN - INLEN % 8) + 8 + INLEN % 8] ^= 0x1F;
+    state[u8 4 * (INLEN - INLEN % 8) + 16 + INLEN % 8] ^= 0x1F;
+    state[u8 4 * (INLEN - INLEN % 8) + 24 + INLEN % 8] ^= 0x1F;
+
+    t256 = SHAKE_SEP;
+    tmp = state[SHAKE128_RATE / 8 - 1];
+    t256 ^= tmp;
+    state[SHAKE128_RATE / 8 - 1] = t256;
+
+    i = 0;
+    while {
+        b = i < OUTRND * SHAKE128_RATE >> 3;
+    }(b) {
+        state = _keccakf1600_4x_avx2(state);
+
+        for k = 0 to SHAKE128_RATE >> 3 {
+            t256 = state[k];
+            t128 = (128u)t256;
+            out0[u64 (int)i + k] = #VMOVLPD(t128);
+            out1[u64 (int)i + k] = #VMOVHPD(t128);
+
+            t128 = #VEXTRACTI128(t256, 1);
+            out2[u64 (int)i + k] = #VMOVLPD(t128);
+            out3[u64 (int)i + k] = #VMOVHPD(t128);
+        }
+
+        i += SHAKE128_RATE >> 3;
+    }
+
+    // squeeze final block
+    state = _keccakf1600_4x_avx2(state);
+
+    for k = 0 to OUTLEN % SHAKE128_RATE >> 3 {
+        t256 = state[k];
+        t128 = (128u)t256;
+        out0[u64 k + (OUTRND * SHAKE128_RATE >> 3)] = #VMOVLPD(t128);
+        out1[u64 k + (OUTRND * SHAKE128_RATE >> 3)] = #VMOVHPD(t128);
+
+        t128 = #VEXTRACTI128(t256, 1);
+        out2[u64 k + (OUTRND * SHAKE128_RATE >> 3)] = #VMOVLPD(t128);
+        out3[u64 k + (OUTRND * SHAKE128_RATE >> 3)] = #VMOVHPD(t128);
+    }
+
+    t256 = state[OUTLEN % SHAKE128_RATE >> 3];
+    t128 = (128u)t256;
+
+    for k = 0 to OUTLEN % SHAKE128_RATE % 8 >> 1 {
+        out0[u16 k + (OUTLEN - OUTLEN % SHAKE128_RATE % 8)/2] = #VPEXTR_16(t128, k);
+        out1[u16 k + (OUTLEN - OUTLEN % SHAKE128_RATE % 8)/2] = #VPEXTR_16(t128, k + 8);
+    }
+
+    t128 = #VEXTRACTI128(t256, 1);
+    for k = 0 to OUTLEN % SHAKE128_RATE % 8 >> 1 {
+        out2[u16 k + (OUTLEN - OUTLEN % SHAKE128_RATE % 8)/2] = #VPEXTR_16(t128, k);
+        out3[u16 k + (OUTLEN - OUTLEN % SHAKE128_RATE % 8)/2] = #VPEXTR_16(t128, k + 8);
+    }
+
+    return out0, out1, out2, out3;
+}
+
+fn _shake128_gen_A_4x(
+  reg ptr u8[2 * N] out0 out1 out2 out3,
+  reg const ptr u8[2 + BYTES_SEED_A] in0 in1 in2 in3,
+  reg u64 ms)
+  ->
+  reg ptr u8[2 * N],
+  reg ptr u8[2 * N],
+  reg ptr u8[2 * N],
+  reg ptr u8[2 * N],
+  #msf reg u64
+{
+    out0, out1, out2, out3 = __shake128_gen_A_4x(out0, out1, out2, out3, in0, in1, in2, in3);
+    ms = #init_msf();
+
+    return out0, out1, out2, out3, ms;
+}
