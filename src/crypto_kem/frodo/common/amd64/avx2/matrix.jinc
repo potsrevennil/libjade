@@ -36,10 +36,8 @@ fn __AS_plus_E(reg ptr u16[NNBAR] B, reg ptr u8[BYTES_SEED_A]seedA, reg ptr u16[
     while {
         bb = i < NNBAR;
     }(bb) {
-        ms = #update_msf(bb, ms);
-
         s_j = j; s_S = S; s_B = B; s_E = E; 
-        A0, A1, A2, A3, ms = _shake128_gen_A_4x(A0, A1, A2, A3, b0, b1, b2, b3, ms);
+        A0, A1, A2, A3 = __shake128_gen_A_4x(A0, A1, A2, A3, b0, b1, b2, b3);
         j = s_j; S = s_S; B = s_B; E = s_E;
 
         for k = 0 to NBAR {
@@ -74,7 +72,6 @@ fn __AS_plus_E(reg ptr u16[NNBAR] B, reg ptr u8[BYTES_SEED_A]seedA, reg ptr u16[
                 }
                 j += 4;
             }
-            ms = #update_msf(!bb1, ms);
 
             B[(int)i + k] = E[(int)i + k];
             B[(int)i + k] += ac0;
@@ -95,7 +92,6 @@ fn __AS_plus_E(reg ptr u16[NNBAR] B, reg ptr u8[BYTES_SEED_A]seedA, reg ptr u16[
         b3[u16 0] += 4;
         i += NBAR * 4;
     }
-    ms = #update_msf(!bb, ms);
     
     return B, ms;
 }
